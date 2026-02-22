@@ -10,7 +10,7 @@ unset CXXFLAGS
 source env.sh
 
 cargo install test-mobile --locked
-test-mobile
+test-mobile ${@+"$@"}
 
 cd mobile/iOS
 
