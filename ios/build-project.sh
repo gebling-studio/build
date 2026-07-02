@@ -16,4 +16,7 @@ cd mobile/iOS
 
 xcodebuild -showsdks
 
-xcodebuild -sdk iphonesimulator -scheme $PROJECT_NAME build
+# An explicit destination fails with a clear "iOS is not installed" message
+# when the platform is missing. The -sdk flag instead falls back to a Mac
+# Catalyst destination and dies at link time with an arch mismatch.
+xcodebuild -scheme $PROJECT_NAME -destination "generic/platform=iOS Simulator" build
