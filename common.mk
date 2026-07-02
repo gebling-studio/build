@@ -1,12 +1,12 @@
 
 ios:
-	./build/ios/build-project.sh
+	bun ./build/ios/build-project.ts
 
 ios-lib:
-	./build/ios/build-lib.sh
+	bun ./build/ios/build-lib.ts
 
 android:
-	./build/build.sh android
+	bun ./build/build.ts android
 
 test:
 	cargo test --all
@@ -15,10 +15,10 @@ test:
 	echo release test: OK
 
 fly:
-	./build/ios/flight.sh
+	bun ./build/ios/flight.ts
 
 profile:
-	./build/scripts/profile.sh
+	bun ./build/scripts/profile.ts
 
 pr:
 	gh pr create --fill
