@@ -12,16 +12,17 @@ cd /host
 if command -v apt > /dev/null; then
     export DEBIAN_FRONTEND=noninteractive
     apt update
-    apt install -y curl unzip sudo
+    apt install -y curl unzip sudo git
 elif command -v pacman > /dev/null; then
-    pacman -Sy unzip sudo --noconfirm
+    pacman -Sy unzip sudo git --noconfirm
 elif command -v dnf > /dev/null; then
-    dnf install -y unzip sudo
+    dnf install -y unzip sudo git
 elif command -v yum > /dev/null; then
-    yum install -y unzip sudo
+    yum install -y unzip sudo git
 elif command -v zypper > /dev/null; then
-    zypper install -y unzip sudo
+    zypper install -y unzip sudo git
 fi
+git config --global --add safe.directory '*'
 curl -fsSL https://bun.sh/install | bash
 export PATH="$HOME/.bun/bin:$PATH"
 ${buildCommand}
@@ -39,6 +40,8 @@ ${buildCommand}
             "--cap-add=SYS_PTRACE",
             "--security-opt",
             "seccomp=unconfined",
+            "-e",
+            "SKIP_UI_TESTS",
             "-t",
             image,
             "/bin/bash",
