@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { env } from "../../env";
-import { run } from "../run";
+import { capture, run } from "../run";
 
 run("bun ./build/ios/build-project.ts");
 
@@ -11,6 +11,9 @@ delete process.env.CXXFLAGS;
 const exportOptionsPlist = "export.plist";
 const archivePath = `build/${env.PROJECT_NAME}.xcarchive`;
 const ipaPath = `build/${env.PROJECT_NAME}.ipa`;
+
+// Gebling Games Studio Infisical project, holds the Apple upload secret
+const infisicalProject = "e2dd64d9-130c-4072-bd3d-0a98331364cb";
 
 process.chdir("mobile/iOS");
 
@@ -33,6 +36,10 @@ run(
 );
 console.log("export: OK");
 
-// $FLIGHT_PASS expands inside the child shell so the password never gets printed
-run(`xcrun altool --upload-app -f "${ipaPath}" -u 146100@gmail.com -p "$FLIGHT_PASS" --type ios`);
+process.env.APPLE_APP_SPECIFIC_PASSWORD = capture(
+    `infisical secrets get APPLE_APP_SPECIFIC_PASSWORD --projectId ${infisicalProject} --env prod --plain --silent`,
+);
+
+// the password stays a shell variable so it never gets printed in the echoed command
+run(`xcrun altool --upload-app -f "${ipaPath}" -u 146100@gmail.com -p "$APPLE_APP_SPECIFIC_PASSWORD" --type ios`);
 console.log("upload: OK");
