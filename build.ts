@@ -4,8 +4,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { arch, homedir, version } from "node:os";
 import { env } from "../env";
-import { installJava } from "./install_java";
-import { installNdk } from "./install_ndk";
 import { run } from "./run";
 
 const isMac = process.platform === "darwin";
@@ -20,8 +18,9 @@ const android = args.includes("android");
 console.log("ANDROID_LIB_NAME: " + env.ANDROID_LIB_NAME);
 console.log("PROJECT_NAME: " + env.PROJECT_NAME);
 
-if (process.env.CI === "true" && android) {
-    console.log("Building android inside GitHub Actions");
+// The android build always runs inside docker, locally and in CI, so the
+// host needs no Android tooling. The env var marks being inside already.
+if (android && !process.env.TEST_ENGINE_ANDROID_DOCKER_BUILD) {
     run("bun ./build/in_docker_android.ts");
     process.exit(0);
 }
@@ -57,23 +56,22 @@ const isAmazon = release.includes("amazon");
 const isOpensuse = release.includes("opensuse");
 
 function buildAndroid() {
+    run("rustup toolchain install");
     run(
         "rustup target add armv7-linux-androideabi aarch64-linux-android i686-linux-android x86_64-linux-android",
     );
 
-    run("cargo install test-mobile");
+    run("cargo install test-mobile --locked");
     run("test-mobile");
 
-    if (process.env.TEST_ENGINE_ANDROID_DOCKER_BUILD) {
-        installJava();
-        installNdk();
-    }
-
     process.chdir("mobile/android");
-    if (unix) {
-        run("chmod +x ./gradlew");
-    }
+    run("chmod +x ./gradlew");
     run("./gradlew build");
+}
+
+if (android) {
+    buildAndroid();
+    process.exit(0);
 }
 
 if (isLinux) {
@@ -128,9 +126,6 @@ if (unix) {
 
 if (ios) {
     run("bun ./build/ios/build-project.ts");
-} else if (android) {
-    console.log("Ondroed");
-    buildAndroid();
 } else {
     run("cargo build --all --profile=ci");
     run("cargo test --all --profile=ci");
