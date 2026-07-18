@@ -10,17 +10,14 @@ fn main() -> Result<()> {
 
     run("sudo df -h")?;
 
-    let mut paths = vec![
+    // RustScript is installed in the runner tool cache and must survive this step.
+    let paths = vec![
         "/usr/share/dotnet".to_string(),
         "/opt/ghc".to_string(),
         "/usr/local/share/boost".to_string(),
         "/usr/local/lib/android".to_string(),
-        "/opt/hostedtoolcache".to_string(),
         "/__t/CodeQL".to_string(),
     ];
-    if let Ok(tools) = std::env::var("AGENT_TOOLSDIRECTORY") {
-        paths.push(tools);
-    }
 
     for path in &paths {
         run_allow_fail(&format!("sudo rm -rf \"{path}\""));

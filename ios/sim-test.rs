@@ -20,15 +20,20 @@
 // make ui, so only [ios] milestones and failures are printed, to keep the two
 // streams from mangling each other. A failed command dumps its captured output.
 
+use std::{thread::sleep, time::Duration};
+
 use anyhow::{Result, bail};
 use regex::Regex;
-use shared::config;
-use shared::run::{probe, run_quiet};
+use shared::{
+    config,
+    run::{probe, run_quiet},
+};
 
 const DEVICE_NAME: &str = "te-iPhone8-16.4";
 const DEVICE_TYPE: &str = "com.apple.CoreSimulator.SimDeviceType.iPhone-8";
 const RUNTIME: &str = "com.apple.CoreSimulator.SimRuntime.iOS-16-4";
 const RUNTIME_HINT: &str = "iOS 16.4";
+const SHUTDOWN_WAIT_SECONDS: u64 = 60;
 
 // A separate cargo target dir so this build never blocks on the desktop lane's
 // target lock, which is what lets the two lanes truly run in parallel. It sits
@@ -93,9 +98,8 @@ SYMROOT={symroot} build",
     let device = ensure_device()?;
 
     step(&format!("booting {DEVICE_NAME}"));
-    run_quiet(&format!("xcrun simctl boot {device} || true"))?;
+    boot_device(&device)?;
     run_quiet("open -a Simulator")?;
-    run_quiet(&format!("xcrun simctl bootstatus {device}"))?;
     run_quiet(&format!("xcrun simctl install {device} \"{app}\""))?;
 
     // TE_RUN_TESTS makes the app run the suite and exit. --console streams its
@@ -127,6 +131,22 @@ SYMROOT={symroot} build",
 
     step(&format!("ok: {total} tests, 0 failed"));
     Ok(())
+}
+
+fn boot_device(device: &str) -> Result<()> {
+    for elapsed in 0..SHUTDOWN_WAIT_SECONDS {
+        let state = probe(&format!("xcrun simctl list devices | grep \"{DEVICE_NAME} (\""));
+        if !state.contains("(Shutting Down)") {
+            run_quiet(&format!("xcrun simctl bootstatus {device} -b"))?;
+            return Ok(());
+        }
+        if elapsed == 0 {
+            step(&format!("waiting for {DEVICE_NAME} to finish shutting down"));
+        }
+        sleep(Duration::from_secs(1));
+    }
+
+    bail!("{DEVICE_NAME} did not finish shutting down within {SHUTDOWN_WAIT_SECONDS} seconds")
 }
 
 fn ensure_device() -> Result<String> {
