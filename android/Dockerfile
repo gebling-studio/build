@@ -1,9 +1,10 @@
 # Builds test-engine Android APKs without any host Android tooling.
 # Everything here is a pinned build-time dependency: JDK, Android SDK
-# pieces, NDK, python3 for rust-android-gradle, bun for the build
-# scripts, rustup with no toolchain. The Rust toolchain, cargo registry
-# and gradle caches live in named volumes mounted by in_docker_android.ts,
-# so bumping rust-toolchain.toml never invalidates this image.
+# pieces, NDK, python for rust-android-gradle, the rustscript interpreter
+# for the build scripts, rustup with no toolchain. The Rust toolchain,
+# cargo registry and gradle caches live in named volumes mounted by
+# in_docker_android.rs, so bumping rust-toolchain.toml never invalidates
+# this image.
 #
 # Google ships the NDK and build-tools for linux x86_64 only, so this
 # image is always amd64. On Apple Silicon it runs under Rosetta.
@@ -16,8 +17,7 @@ ENV ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION
 
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
-ENV BUN_INSTALL=/usr/local/bun
-ENV PATH=$CARGO_HOME/bin:$BUN_INSTALL/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+ENV PATH=$CARGO_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     pkg-config \
     python3 \
+    python-is-python3 \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -46,7 +47,14 @@ RUN mkdir -p $ANDROID_HOME/cmdline-tools \
 RUN yes | sdkmanager --licenses > /dev/null \
     && sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;$NDK_VERSION"
 
-RUN curl -fsSL https://bun.sh/install | bash
+# The build scripts are rustscript. The linux builds are static musl, so this
+# needs no toolchain of its own. Keep the version in step with in_docker.rs.
+ARG RUSTSCRIPT_VERSION=v0.1.4
+RUN curl -fsSL \
+    "https://github.com/VladasZ/rustscript/releases/download/${RUSTSCRIPT_VERSION}/rust-${RUSTSCRIPT_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    -o /tmp/rustscript.tar.gz \
+    && tar xzf /tmp/rustscript.tar.gz -C /usr/local/bin \
+    && rm /tmp/rustscript.tar.gz
 
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain none --profile minimal --no-modify-path
 

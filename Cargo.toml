@@ -1,0 +1,16 @@
+[package]
+name = "build-scripts"
+version = "0.0.0"
+edition = "2024"
+
+# rustscript resolves a script's crate dependencies from the nearest Cargo.toml,
+# so this is what lets the scripts `use shared::..` and pull in regex and tokio.
+[dependencies]
+anyhow = "1.0"
+regex = "1"
+shared = { path = "shared" }
+tokio = { version = "1", features = ["full"] }
+
+# Its own workspace root, so the submodule stays self contained and a consuming
+# repo never has to list it as a member.
+[workspace]
