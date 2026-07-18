@@ -61,7 +61,10 @@ if command -v apt > /dev/null; then
 elif command -v pacman > /dev/null; then
     pacman -Sy curl tar sudo git --noconfirm
 elif command -v dnf > /dev/null; then
-    dnf install -y curl tar sudo git
+    dnf install -y tar sudo git
+    if ! command -v curl > /dev/null; then
+        dnf install -y curl
+    fi
 elif command -v yum > /dev/null; then
     yum install -y curl tar sudo git
 elif command -v zypper > /dev/null; then
