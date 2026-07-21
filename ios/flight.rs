@@ -30,9 +30,16 @@ fn main() -> Result<()> {
     println!("codesign identity:");
     run("security find-identity -p codesigning -v")?;
 
+    // Weak link the frameworks that carry modern data constants. On iOS 12 and
+    // 13 dyld binds a strong data symbol eagerly, so a constant the device lacks
+    // like kCGColorSpaceExtendedDisplayP3 or kSecUseDataProtectionKeychain kills
+    // the app before main. Weak linking makes the missing constant NULL instead.
+    // test-mobile regenerates the project with no OTHER_LDFLAGS, so set it here
+    // on the archive command so every TestFlight build keeps running on old iOS.
     run(&format!(
         "xcodebuild -project \"{}\".xcodeproj -scheme \"{}\" \
--sdk iphoneos -configuration Release archive -archivePath \"{archive_path}\"",
+-sdk iphoneos -configuration Release archive -archivePath \"{archive_path}\" \
+OTHER_LDFLAGS=\"-Wl,-weak_framework,CoreGraphics -Wl,-weak_framework,Security\"",
         config.project_name, config.project_name
     ))?;
     println!("build: OK");
