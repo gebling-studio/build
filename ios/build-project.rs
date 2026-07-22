@@ -19,6 +19,14 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     run(format!("test-mobile {}", args.join(" ")).trim())?;
 
+    // test-mobile bakes CFBundleShortVersionString 1.0 into the generated
+    // Info.plist with no knob, so set the real version before the archive reads
+    // it. Runs from the repo root, before the chdir below.
+    run(&format!(
+        "/usr/libexec/PlistBuddy -c \"Set :CFBundleShortVersionString {}\" mobile/iOS/{}/Info.plist",
+        config.version, config.project_name
+    ))?;
+
     std::env::set_current_dir("mobile/iOS")?;
 
     run("xcodebuild -showsdks")?;

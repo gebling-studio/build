@@ -13,6 +13,11 @@ pub struct Config {
     /// the staticlib cargo lipo produces, which the Xcode project links
     pub lib_name: String,
     pub bundle_id: String,
+    /// CFBundleShortVersionString for the iOS build. test-mobile bakes 1.0 into
+    /// the generated Info.plist with no knob, so the build patches it from this
+    /// value. The App Store rejects an upload whose version is not higher than
+    /// the live one.
+    pub version: String,
 }
 
 /// Read from the repo root. Several scripts chdir into mobile/iOS partway
@@ -32,6 +37,7 @@ pub fn read() -> Result<Config> {
         .context("bundle_id not found in test-engine.toml")?
         .as_str()
         .unwrap_or_default();
+    let version = value.get("version").and_then(|v| v.as_str()).unwrap_or("1.0");
 
     let parts = words(project);
     let snake = parts.join("_");
@@ -41,6 +47,7 @@ pub fn read() -> Result<Config> {
         project_name: parts.iter().map(|w| capitalize(w)).collect::<String>(),
         lib_name: format!("lib{snake}.a"),
         bundle_id: bundle_id.to_string(),
+        version: version.to_string(),
     })
 }
 
