@@ -99,7 +99,7 @@ async fn main() -> Result<()> {
     // Start the iOS lane first so it builds and runs while the desktop lanes go.
     let ios = if is_mac {
         Some(tokio::spawn(async {
-            tee("rust ./build/ios/sim-test.rs")
+            tee("TE_IOS_QUIET=1 rust ./build/ios/sim-test.rs")
         }))
     } else {
         None

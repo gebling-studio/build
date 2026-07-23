@@ -16,11 +16,22 @@
 // on a worker task, prints a result marker and exits, so there is no mDNS to
 // disambiguate against the desktop lane running at the same time.
 //
-// Output is quiet on purpose. This runs in parallel with the desktop lane under
-// make ui, so only [ios] milestones and failures are printed, to keep the two
-// streams from mangling each other. A failed command dumps its captured output.
+// On its own the suite streams live, so each test shows up as it runs and a hang
+// names the test it stuck on. The app logs through NSLog, which tags every
+// console line with a timestamp and a process name, so the stream strips that
+// prefix to read like the desktop runner.
+//
+// Under make ui this lane runs in parallel with the desktop lanes, which would
+// mangle three streams into one. That run sets TE_IOS_QUIET, and the lane goes
+// back to buffering and printing only [ios] milestones. A failed command dumps
+// its captured output either way.
 
-use std::{thread::sleep, time::Duration};
+use std::{
+    io::{BufRead, BufReader},
+    process::{Command, Stdio},
+    thread::sleep,
+    time::Duration,
+};
 
 use anyhow::{Result, bail};
 use regex::Regex;
@@ -43,6 +54,32 @@ const SIM_TRIPLE: &str = "x86_64-apple-ios";
 
 fn step(message: &str) {
     println!("\n[ios] {message}");
+}
+
+/// Stream a command's combined output live and capture it, so the run stays
+/// watchable and the result marker can still be parsed from the text after.
+///
+/// The app logs through NSLog, which the simulator console tags with a
+/// timestamp and a process name in front of every line. Strip that so the
+/// stream reads clean like the desktop runner. The app's own stdout lines,
+/// such as the result marker, carry no such prefix and pass through untouched.
+fn stream(command: &str) -> Result<String> {
+    let prefix = Regex::new(r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ \S+\[\d+:\d+\] ")?;
+    let mut child = Command::new("sh")
+        .arg("-c")
+        .arg(format!("{command} 2>&1"))
+        .stdout(Stdio::piped())
+        .spawn()?;
+    let stdout = child.stdout.take().expect("stdout was piped");
+    let mut output = String::new();
+    for line in BufReader::new(stdout).lines() {
+        let line = prefix.replace(&line?, "").into_owned();
+        println!("{line}");
+        output.push_str(&line);
+        output.push('\n');
+    }
+    child.wait()?;
+    Ok(output)
 }
 
 fn main() -> Result<()> {
@@ -105,11 +142,19 @@ SYMROOT={symroot} build",
     // TE_RUN_TESTS makes the app run the suite and exit. --console streams its
     // stdout here, so the result marker arrives before the launch returns.
     step("running the UI suite on the simulator");
-    let output = probe(&format!(
-        "SIMCTL_CHILD_TE_RUN_TESTS=1 xcrun simctl launch --console \
---terminate-running-process {device} {} 2>&1",
+    let launch = format!(
+        "SIMCTL_CHILD_TE_RUN_TESTS=1 xcrun simctl launch --console --terminate-running-process {device} {}",
         config.bundle_id
-    ));
+    );
+
+    // Under make ui three lanes run at once, so this lane stays quiet to keep
+    // the streams from mangling. Run on its own and it streams every test live
+    // like the desktop runner.
+    let output = if std::env::var("TE_IOS_QUIET").is_ok() {
+        probe(&format!("{launch} 2>&1"))
+    } else {
+        stream(&launch)?
+    };
 
     run_quiet(&format!("xcrun simctl shutdown {device} || true"))?;
     probe("osascript -e 'tell application \"Simulator\" to quit'");
